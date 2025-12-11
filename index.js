@@ -63,5 +63,5 @@ app.get("/", (req, res) => {
 
 
 app.listen(PORT, () => {
-  console.log(`🚀 Todo API running at http://localhost:${PORT}`);
+  console.log(`🚀  API running at http://localhost:${PORT}`);
 });
