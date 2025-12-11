@@ -17,6 +17,7 @@ router.get('/user-orders/:user_id', orderController.getOrdersByUser); // orders 
 router.put('/orders/:o_id', orderController.updateOrderById);    // update order
 router.delete('/orders/:o_id', orderController.softDeleteOrder); // soft delete
 router.get('/orders-stats', orderController.getOrderStats);      // aggregated stats
+router.get('/orders/filter/orders-by', orderController.getOrdersByDateFilter)
 
 router.get('/products', productController.getAllProducts);        // fetch all
 router.get('/products/:id', productController.getProductById);    // fetch by id

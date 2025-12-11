@@ -145,7 +145,7 @@ const softDeleteOrder = async (req, res) => {
   }
 };
 
-// Aggregated: total price per user, city with most orders (optionally filtered by user)
+
 const getOrderStats = async (req, res) => {
   const { user_id } = req.query; // optional query param
   try {
@@ -166,7 +166,6 @@ const getOrderStats = async (req, res) => {
 
     const [userTotals] = await pool.execute(userTotalsQuery, userTotalsParams);
 
-    // City with most orders
     let cityStatsQuery = `
       SELECT a.city, COUNT(*) AS total_orders
       FROM orders o
@@ -197,11 +196,82 @@ const getOrderStats = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error', data: null });
   }
 };
+
+const getOrdersByDateFilter = async (req, res) => {
+  const { day, month, year, week, date } = req.query;
+
+  try {
+    let whereClauses = ["o.is_deleted = 0"];
+    let params = [];
+
+    if (date) {
+      whereClauses.push("DATE(o.created_at) = ?");
+      params.push(date);
+    }
+
+
+    if (year) {
+      whereClauses.push("YEAR(o.created_at) = ?");
+      params.push(year);
+    }
+
+ 
+    if (month) {
+      whereClauses.push("MONTH(o.created_at) = ?");
+      params.push(month);
+    }
+
+
+    if (day) {
+      whereClauses.push("DAY(o.created_at) = ?");
+      params.push(day);
+    }
+
+  
+    if (week) {
+      whereClauses.push("WEEK(o.created_at) = ?");
+      params.push(week);
+    }
+
+    const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
+
+    const [rows] = await pool.execute(`
+      SELECT 
+        o.o_id, o.qty, o.price, o.created_at, o.updated_at,
+        u.id AS user_id, u.name AS user_name, u.email AS user_email,
+        a.address, a.city,
+        p.id AS product_id, p.name AS product_name, p.price AS product_price
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      JOIN products p ON o.product_id = p.id
+      LEFT JOIN addresses a ON a.user_id = u.id
+      ${whereSQL}
+      ORDER BY o.created_at DESC
+    `, params);
+
+    res.json({
+      success: true,
+      message: rows.length ? "Orders fetched successfully" : "No orders found",
+      filters_used: { day, month, year, week, date },
+      data: rows
+    });
+
+  } catch (error) {
+    console.error("DB Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      data: []
+    });
+  }
+};
+
 module.exports = {
   getAllOrders,
   getOrderById,
   getOrdersByUser,
   updateOrderById,
   softDeleteOrder,
-  getOrderStats
+  getOrderStats,
+  getOrdersByDateFilter
 };
