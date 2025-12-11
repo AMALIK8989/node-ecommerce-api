@@ -1,25 +1,30 @@
-// backend/Controller/productController.js
 const pool = require('../db/db');
+const { buildSortQuery } = require("../utils/sort");
 
-// Get all products
+// Get all products with optional sorting
 const getAllProducts = async (req, res) => {
-  const { sortBy = 'created_at', order = 'DESC' } = req.query; // optional sorting
+  const { sort_by, order } = req.query;
   try {
-    const [rows] = await pool.execute(`
+    let query = `
       SELECT id, name, price, qty, created_at, updated_at
       FROM products
       WHERE is_deleted = 0
-      ORDER BY ${sortBy} ${order}
-    `);
+    `;
+
+    // Allowed fields for sorting
+    const allowed = ["name", "price", "qty", "created_at", "updated_at"];
+    query += buildSortQuery(sort_by, order, allowed);
+
+    const [rows] = await pool.execute(query);
 
     res.json({
       success: true,
-      message: rows.length ? 'Products fetched successfully' : 'No products found',
+      message: rows.length ? "Products fetched successfully" : "No products found",
       data: rows
     });
   } catch (error) {
-    console.error('DB Error:', error);
-    res.status(500).json({ success: false, message: 'Server error', data: [] });
+    console.error("DB Error:", error);
+    res.status(500).json({ success: false, message: "Server error", data: [] });
   }
 };
 
@@ -33,7 +38,7 @@ const getProductById = async (req, res) => {
       WHERE id = ? AND is_deleted = 0
     `, [id]);
 
-    if (rows.length === 0) {
+    if (!rows.length) {
       return res.status(404).json({ success: false, message: 'Product not found', data: null });
     }
 
@@ -75,7 +80,7 @@ const updateProductById = async (req, res) => {
       WHERE id = ? AND is_deleted = 0
     `, [name, price, qty, id]);
 
-    if (result.affectedRows === 0) {
+    if (!result.affectedRows) {
       return res.status(404).json({ success: false, message: 'Product not found or deleted', data: null });
     }
 
@@ -100,7 +105,7 @@ const softDeleteProduct = async (req, res) => {
       WHERE id = ? AND is_deleted = 0
     `, [id]);
 
-    if (result.affectedRows === 0) {
+    if (!result.affectedRows) {
       return res.status(404).json({ success: false, message: 'Product not found or already deleted', data: null });
     }
 
@@ -110,6 +115,8 @@ const softDeleteProduct = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error', data: null });
   }
 };
+
+// Get most selling product (by total quantity sold)
 const getMostSellingProduct = async (req, res) => {
   try {
     const [rows] = await pool.execute(`
@@ -117,7 +124,7 @@ const getMostSellingProduct = async (req, res) => {
         p.id AS product_id, 
         p.name AS product_name, 
         SUM(o.qty) AS total_qty_sold,
-        SUM(o.price) AS total_revenue
+        SUM(o.price * o.qty) AS total_revenue
       FROM orders o
       JOIN products p ON o.product_id = p.id
       WHERE o.is_deleted = 0
@@ -126,12 +133,8 @@ const getMostSellingProduct = async (req, res) => {
       LIMIT 1
     `);
 
-    if (rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'No orders found',
-        data: null
-      });
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'No orders found', data: null });
     }
 
     res.json({
@@ -144,12 +147,12 @@ const getMostSellingProduct = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error', data: null });
   }
 };
+
 module.exports = {
   getAllProducts,
   getProductById,
   createProduct,
   updateProductById,
   softDeleteProduct,
-getMostSellingProduct
-
+  getMostSellingProduct
 };
